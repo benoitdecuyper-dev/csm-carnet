@@ -13,7 +13,10 @@
 .cr *{box-sizing:border-box;}
 .cr .filigrane{
   position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-  height:74%;width:auto;max-width:72%;opacity:.10;mix-blend-mode:multiply;
+  /* la boîte est bornée dans les deux sens : sans object-fit, la borne de
+     largeur écrase l'image sans réduire sa hauteur. */
+  height:74%;width:72%;object-fit:contain;object-position:center;
+  opacity:.10;mix-blend-mode:multiply;
   pointer-events:none;user-select:none;
 }
 .cr .contenu{position:relative;}
@@ -133,7 +136,7 @@
     -webkit-print-color-adjust:exact;print-color-adjust:exact;
   }
   .cr .filigrane{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
-    height:62%;max-width:none;opacity:.055;}
+    height:62%;width:66%;object-fit:contain;object-position:center;opacity:.055;}
 
   /* page d'honneur encadrée */
   .cr .premiere{

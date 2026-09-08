@@ -165,7 +165,11 @@ function toast(txt) {
 const SE = () => S.seance;
 const SEC = () => SECTIONS[secCourante - 1];
 const duSec = k => SE() ? SE().notes.filter(n => n.sec === k) : [];
-const chevaliers = () => S.effectif.filter(f => !f.asp);
+/* Le Padre siège au conseil sans y être chevalier : il compte à part.
+   Les tirages, eux, le comptent parmi ceux à placer. */
+const chevaliers = () => S.effectif.filter(f => !f.asp && !f.pere);
+const pretres = () => S.effectif.filter(f => f.pere && !f.asp);
+const aPlacer = () => S.effectif.filter(f => !f.asp);
 function presents() { const s = SE(); if (!s) return 0;
   return S.effectif.filter(f => s.presence[f.id] === "P").length; }
 function etatPres(f) { const s = SE(); return (s && s.presence[f.id]) || "A"; }
@@ -650,7 +654,7 @@ function melange(t) {
 }
 function completerTrinomes() {
   const places = S.trinomes.flat().filter(Boolean);
-  const reste = melange(chevaliers().filter(f => !places.includes(f.id)).map(f => f.id));
+  const reste = melange(aPlacer().filter(f => !places.includes(f.id)).map(f => f.id));
   if (!reste.length) return 0;
   const n = reste.length;
   S.trinomes.forEach(t => {
@@ -660,12 +664,13 @@ function completerTrinomes() {
     const t = [reste.shift() || "", reste.shift() || "", reste.shift() || ""];
     S.trinomes.push(t);
   }
-  /* Un frère seul rejoint le dernier trinôme plutôt que d'y rester seul. */
+  /* Un binôme se tient ; un frère seul, non : on le rattache à un groupe
+     qui a de la place plutôt que de le laisser seul. */
   if (S.trinomes.length > 1) {
     const d = S.trinomes[S.trinomes.length - 1];
     if (d.filter(Boolean).length === 1) {
-      const av = S.trinomes[S.trinomes.length - 2];
-      if (av.filter(Boolean).length < 3) { av[av.indexOf("")] = d.find(Boolean); S.trinomes.pop(); }
+      const av = S.trinomes.slice(0, -1).find(t => t.filter(Boolean).length < 3);
+      if (av) { av[av.indexOf("")] = d.find(Boolean); S.trinomes.pop(); }
     }
   }
   maj();
@@ -673,7 +678,7 @@ function completerTrinomes() {
 }
 function designerTopos() {
   const pris = S.topos.map(t => (t[1] || "").trim()).filter(Boolean);
-  const libres = melange(chevaliers().map(nomc).filter(x => !pris.includes(x)));
+  const libres = melange(aPlacer().map(nomc).filter(x => !pris.includes(x)));
   let n = 0;
   S.topos.forEach(t => {
     if (!(t[1] || "").trim() && libres.length) { t[1] = libres.shift(); n++; }
@@ -685,19 +690,20 @@ function designerTopos() {
 function outilSpirituel(v) {
   const o = el("div", "outil");
   const th = el("div", "th");
-  th.appendChild(el("h3", null, "Trinômes de fraternité"));
-  th.appendChild(el("span", "cpt", S.trinomes.length + " trinômes"));
+  th.appendChild(el("h3", null, "Trinômes et binômes de fraternité"));
+  th.appendChild(el("span", "cpt", S.trinomes.length + " groupes"));
   o.appendChild(th);
 
   const tb = el("div", "tb plat");
   S.trinomes.forEach((t, i) => {
     const l = el("div", "tri-l");
     l.appendChild(el("span", "tri-n", String(i + 1)));
+    /* deux places suffisent : un binôme n'est pas un trinôme incomplet */
     const box = el("div", "tri-s");
     [0,1,2].forEach(j => box.appendChild(selFrere(t[j] || "", x => { S.trinomes[i][j] = x; maj(); })));
     l.appendChild(box);
     const b = el("button", "mini", "×"); b.type = "button";
-    b.setAttribute("aria-label", "Retirer le trinôme " + (i + 1));
+    b.setAttribute("aria-label", "Retirer le groupe " + (i + 1));
     b.addEventListener("click", () => { S.trinomes.splice(i, 1); maj(); });
     l.appendChild(b);
     tb.appendChild(l);
@@ -705,24 +711,24 @@ function outilSpirituel(v) {
   o.appendChild(tb);
 
   const f = el("div", "tb");
-  const a = el("button", "addl", "＋ un trinôme"); a.type = "button";
+  const a = el("button", "addl", "＋ un groupe"); a.type = "button";
   a.addEventListener("click", () => { S.trinomes.push(["","",""]); maj(); });
   f.appendChild(a);
   const h = el("button", "addl", "Compléter au hasard"); h.type = "button";
   h.addEventListener("click", () => {
     const n = completerTrinomes();
-    toast(n ? n + (n > 1 ? " frères placés" : " frère placé") + " au hasard." : "Tout le monde a déjà son trinôme.");
+    toast(n ? n + (n > 1 ? " frères placés" : " frère placé") + " au hasard." : "Tout le monde a déjà son groupe.");
   });
   f.appendChild(h);
 
   const places = S.trinomes.flat().filter(Boolean);
   const doublons = [...new Set(places.filter((x, i) => places.indexOf(x) !== i))].map(nomDeId).filter(Boolean);
-  const absents = S.effectif.filter(x => !places.includes(x.id)).map(nomc);
+  const absents = aPlacer().filter(x => !places.includes(x.id)).map(nomc);
   if (doublons.length || absents.length) {
     const al = el("div", "alerte");
     al.appendChild(el("b", null, "À vérifier"));
-    if (doublons.length) al.appendChild(el("div", null, "Dans deux trinômes : " + doublons.join(", ") + "."));
-    if (absents.length) al.appendChild(el("div", null, "Dans aucun trinôme : " + absents.join(", ") + "."));
+    if (doublons.length) al.appendChild(el("div", null, "Dans deux groupes : " + doublons.join(", ") + "."));
+    if (absents.length) al.appendChild(el("div", null, "Dans aucun groupe : " + absents.join(", ") + "."));
     f.appendChild(al);
   }
   f.appendChild(el("div", "derive", "Donnée d'année : elle se reporte seule dans chaque compte rendu, et ne se retape pas d'un mois sur l'autre."));
@@ -748,10 +754,12 @@ function outilPresentation(v) {
    passe-t-il l'Exemplification. */
 function outilRecrutement(v) {
   const ch = chevaliers().length, asp = S.effectif.filter(f => f.asp).length;
+  const pr = pretres().length;
   const o = el("div", "outil");
   const th = el("div", "th");
   th.appendChild(el("h3", null, "Où en est l'effectif"));
-  th.appendChild(el("span", "cpt", ch + " chevaliers · " + asp + " aspirants"));
+  th.appendChild(el("span", "cpt", ch + " chevaliers · " + asp + " aspirants"
+    + (pr ? " · " + pr + (pr > 1 ? " prêtres" : " prêtre") : "")));
   o.appendChild(th);
   const tb = el("div", "tb");
   champ(tb, "Objectif de l'année fraternelle", S.objectif, x => { S.objectif = x; }, "trois nouveaux frères");
@@ -874,7 +882,7 @@ function outilTopos(v) {
       cq.appendChild(el("span", null, "Quel frère"));
       const sq = el("select");
       const vq = el("option", null, "— à désigner —"); vq.value = ""; sq.appendChild(vq);
-      chevaliers().forEach(x => { const op = el("option", null, nomc(x)); op.value = nomc(x); sq.appendChild(op); });
+      aPlacer().forEach(x => { const op = el("option", null, nomc(x)); op.value = nomc(x); sq.appendChild(op); });
       sq.addEventListener("change", () => { b.qui = sq.value; });
       cq.appendChild(sq); c.appendChild(cq);
     }, b => {
@@ -1067,7 +1075,8 @@ function vueFreres(v) {
   const th = el("div", "th");
   th.appendChild(el("h3", null, "Effectif du conseil"));
   th.appendChild(el("span", "cpt", chevaliers().length + " chevaliers · "
-    + S.effectif.filter(f => f.asp).length + " aspirants"));
+    + S.effectif.filter(f => f.asp).length + " aspirants"
+    + (pretres().length ? " · " + pretres().length + (pretres().length > 1 ? " prêtres" : " prêtre") : "")));
   o.appendChild(th);
 
   /* Des départs se prononcent souvent ensemble : on coche, on retire une fois. */
@@ -1197,7 +1206,8 @@ function documentHTML(src) {
   const d = new Date(s.debut);
   const pres = eff.filter(f => s.presence[f.id] === "P");
   const exc = eff.filter(f => s.presence[f.id] === "E");
-  const ch = eff.filter(f => !f.asp).length, asp = eff.filter(f => f.asp).length;
+  const peres = eff.filter(f => f.pere && !f.asp);
+  const ch = eff.filter(f => !f.asp && !f.pere).length, asp = eff.filter(f => f.asp).length;
   const notesDe = k => s.notes.filter(n => n.sec === k && n.txt.trim() && n.type !== "action");
   const actions = s.notes.filter(n => n.type === "action" && n.txt.trim());
 
@@ -1282,7 +1292,10 @@ function documentHTML(src) {
 
   /* ---------- le registre ---------- */
   let corps = "<p>Le conseil compte <b>" + ch + " chevalier" + (ch > 1 ? "s" : "")
-    + "</b> et <b>" + asp + " aspirant" + (asp > 1 ? "s" : "") + "</b>.</p>";
+    + "</b> et <b>" + asp + " aspirant" + (asp > 1 ? "s" : "") + "</b>"
+    + (peres.length ? ", auprès " + peres.map(f => "du " + esc(nomc(f))).join(" et ")
+        + ", " + (peres.length > 1 ? "aumôniers" : "aumônier") + " du conseil" : "")
+    + ".</p>";
   if (pres.length) corps += "<p><b>Présents :</b> " + pres.map(f => esc(nomc(f))).join(", ") + ".</p>";
   if (exc.length) corps += "<p><b>Excusé" + (exc.length > 1 ? "s" : "") + " :</b> " + exc.map(f => esc(nomc(f))).join(", ") + ".</p>";
   const inv = (s.invites || []).filter(x => x.txt.trim());
@@ -1361,7 +1374,7 @@ function documentHTML(src) {
   corps = "";
   const tri = src.trinomes.filter(t => t.some(Boolean));
   if (tri.length) {
-    corps += "<p><b>Trinômes de fraternité.</b> Mis en place pour favoriser des moments de prière et d’échange entre les membres. Chaque trinôme déjeune ensemble au moins deux fois dans l’année, et chacun prie pour les deux autres.</p>";
+    corps += "<p><b>Trinômes et binômes de fraternité.</b> Mis en place pour favoriser des moments de prière et d’échange entre les membres. Chaque groupe déjeune ensemble au moins deux fois dans l’année, et chacun prie pour les autres.</p>";
     corps += '<table class="tri"><tbody>' + tri.map(t =>
       "<tr>" + t.map(x => "<td>" + esc(nomDe(x)) + "</td>").join("") + "</tr>").join("") + "</tbody></table>";
   }
@@ -1587,8 +1600,10 @@ function texteDuCR(src) {
   const pres = eff.filter(f => s.presence[f.id] === "P").map(f => nomDe(f.id));
   const exc = eff.filter(f => s.presence[f.id] === "E").map(f => nomDe(f.id));
   const inv = (s.invites || []).map(x => x.txt.trim()).filter(Boolean);
+  const peresPdf = eff.filter(f => f.pere && !f.asp).map(f => nomDe(f.id));
   bloc("Effectif", [
-    eff.filter(f => !f.asp).length + " chevaliers, " + eff.filter(f => f.asp).length + " aspirants.",
+    eff.filter(f => !f.asp && !f.pere).length + " chevaliers, " + eff.filter(f => f.asp).length + " aspirants"
+      + (peresPdf.length ? ", auprès " + peresPdf.map(x => "du " + x).join(" et ") : "") + ".",
     pres.length ? "Présents : " + pres.join(", ") + "." : "",
     exc.length ? "Excusés : " + exc.join(", ") + "." : "",
     inv.length ? "Invités : " + inv.join(", ") + "." : ""
@@ -1618,7 +1633,7 @@ function texteDuCR(src) {
   ].concat(notesDe("france")));
 
   bloc("Propositions spirituelles", src.trinomes.filter(t => t.some(Boolean))
-    .map((t, i) => "Trinôme " + (i + 1) + " : " + t.map(nomDe).filter(Boolean).join(", "))
+    .map((t, i) => "Groupe " + (i + 1) + " : " + t.map(nomDe).filter(Boolean).join(", "))
     .concat(notesDe("spirituel")));
 
   bloc("Présentation d'un frère", [s.presentation.qui
