@@ -168,3 +168,9 @@
   .cr .signature{break-before:avoid;}
   .cr section,.cr p{orphans:3;widows:3;}
 }
+
+/* ---- suivi des aspirants et enregistrements joints ---- */
+.cr .tri.asp td{width:auto;}
+.cr .tri.asp td:first-child{width:46%;font-weight:600;}
+.cr .encadre.audios .au{margin:9px 0;}
+.cr .encadre.audios audio{width:100%;}

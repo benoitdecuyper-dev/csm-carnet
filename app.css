@@ -244,3 +244,42 @@ input,textarea,select{font:inherit;color:inherit;}
   .appli{display:none !important;}
   .impression{display:block;}
 }
+
+/* ================= ajouts de la version 2 ================= */
+
+/* ---- le chrono du topo : lisible de loin, discret quand il déborde ---- */
+.tk{
+  background:var(--bleu-deep);color:#eaf0f6;border-radius:12px;padding:18px 14px 14px;
+  margin-bottom:12px;text-align:center;border:1px solid #24446e;
+}
+.tk-q{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:#9fb8d4;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tk-h{font-size:58px;line-height:1.05;font-weight:600;font-variant-numeric:tabular-nums;
+  letter-spacing:.01em;margin:4px 0 2px;}
+.tk-s{font-size:12.5px;color:#9fb8d4;}
+.tk-b{display:flex;gap:8px;margin-top:13px;}
+.tk-b button{flex:1;border:1px solid #38618f;border-radius:8px;padding:10px 6px;
+  text-align:center;font-size:14px;font-weight:600;color:#dce8f5;min-height:44px;}
+.tk-b button:last-child{background:#e8eef6;color:var(--bleu-deep);border-color:#e8eef6;}
+.tk.over{border-color:var(--or);}
+.tk.over .tk-h{color:#f0d9a4;}
+.tk.over .tk-s{color:var(--or-bg);}
+
+/* ---- formulaires d'ajout : la validation en bas à droite ---- */
+.pied-form{display:flex;justify-content:flex-end;padding-top:6px;}
+.pied-form .gros{width:auto;min-width:190px;margin:0;}
+button.lien{color:var(--bleu);font-size:12.5px;text-decoration:underline;
+  padding:4px 0;min-height:32px;align-self:flex-start;}
+
+/* ---- bac à sable : impossible de croire qu'on est en vrai ---- */
+body.bac .bar{background:#5a4212;}
+body.bac .appli::after{
+  content:"BAC À SABLE — rien n'est conservé";position:absolute;left:0;right:0;bottom:0;
+  background:var(--or);color:#fff;font-size:11px;font-weight:700;letter-spacing:.08em;
+  text-align:center;padding:2px;z-index:40;pointer-events:none;
+}
+
+/* ---- l'écran est petit : on ne le gaspille pas ---- */
+.vue{padding:9px 9px 14px;}
+.raccourcis button.danger{color:var(--rec);border-color:#e5c3bd;background:#fdf7f6;font-weight:600;}
+.raccourcis button:disabled{opacity:.45;}
