@@ -1214,11 +1214,11 @@ function documentHTML(src) {
   const moitie = Math.ceil(dates.length / 2);
   const colDates = c => c.map(x => "<dt>" + esc(x.j) + "</dt><dd>" + esc(x.q) + "</dd>").join("");
 
-  /* topo du prochain conseil */
+  /* topo du prochain conseil : lu au calendrier, d'après le mois de sa date */
   let topo = s.prochain.topo;
   if (!topo) {
-    const m = /^\d{1,2}[\/\-.](\d{1,2})/.exec(s.prochain.date || "");
-    if (m) { const t = src.topos.find(x => (x[0] || "").toLowerCase() === MOIS[parseInt(m[1],10) - 1]); topo = t ? t[1] : ""; }
+    const mois = moisDe(s.prochain.date);
+    if (mois) { const t = src.topos.find(x => (x[0] || "").toLowerCase() === mois); topo = t ? t[1] : ""; }
   }
 
   const ordre = { v:0, c:1, t:2 };
@@ -1494,8 +1494,11 @@ async function construirePage(audios) {
     + '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&display=swap">\n'
     + "<style>\n" + css + "\n"
     + "html,body{margin:0;padding:0;background:#c9cfd6;}\n"
-    + ".cr{margin:0 auto;box-shadow:0 2px 22px rgba(0,0,0,.22);}\n"
-    + "@media print{html,body{background:#fff;} .cr{box-shadow:none;}}\n"
+    /* Sur un écran large, la page tient sa feuille ; sur un téléphone,
+       elle occupe tout, parce qu'une A4 miniature ne se lit pas. */
+    + ".cr{width:190mm;max-width:100%;margin:22px auto;padding:15mm 14mm;box-shadow:0 2px 22px rgba(0,0,0,.22);}\n"
+    + "@media (max-width:840px){.cr{width:auto;margin:0;padding:18px 15px;border:0;border-radius:0;box-shadow:none;min-height:100vh;}}\n"
+    + "@media print{html,body{background:#fff;} .cr{width:auto;margin:0;padding:0;box-shadow:none;}}\n"
     + ".audios .au{margin:10px 0;} .audios .au .nm{font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;}\n"
     + ".audios audio{width:100%;}\n"
     + "</style>\n</head>\n<body>\n" + corps + "\n</body>\n</html>\n";
