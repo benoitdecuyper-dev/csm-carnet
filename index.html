@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#22303f">
+<title>Carnet du Conseil Saint Mommolin</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="cr.css">
+</head>
+<body>
+
+<div class="appli">
+
+  <header class="bar">
+    <div class="ident">
+      <div class="t" id="bar-conseil">Conseil Saint Mommolin</div>
+      <div class="d" id="bar-date">—</div>
+    </div>
+    <div class="chrono" id="chrono">00:00</div>
+    <button class="dicta off" id="dicta" type="button" title="Le dictaphone du téléphone tourne-t-il ?">
+      <span class="dot"></span><span id="dicta-t">Sans audio</span>
+    </button>
+    <button class="rouage" id="ouvrir-reglages" type="button" aria-label="Réglages">⚙</button>
+  </header>
+
+  <div id="secwrap" hidden>
+    <div class="secbar">
+      <button class="nav" id="s-prec" type="button" aria-label="Section précédente">‹</button>
+      <button class="cur" id="s-cur" type="button">
+        <div class="n" id="s-n">1 sur 11</div>
+        <div class="l" id="s-l">Effectif</div>
+      </button>
+      <button class="nav" id="s-suiv" type="button" aria-label="Section suivante">›</button>
+    </div>
+    <div class="jauge"><i id="jauge"></i></div>
+  </div>
+
+  <main class="vue" id="vue" tabindex="-1"></main>
+
+  <div class="compose" id="compose" hidden>
+    <div class="row">
+      <textarea id="saisie" rows="1" placeholder="Note…" enterkeyhint="enter"></textarea>
+      <button class="go" id="go" type="button" aria-label="Ajouter la note" disabled>↑</button>
+    </div>
+    <div class="sec">
+      <button type="button" id="m-action" aria-pressed="false">＋ action</button>
+      <span class="sp" id="m-etat">note simple</span>
+    </div>
+  </div>
+
+  <nav class="nav5" id="nav5">
+    <button type="button" data-v="seance" aria-current="page"><span class="i">✎</span>Séance</button>
+    <button type="button" data-v="freres"><span class="i">☰</span>Frères</button>
+    <button type="button" data-v="cr"><span class="i">▤</span>Compte rendu</button>
+  </nav>
+
+  <div class="sheet" id="sheet" hidden><div class="in" id="sheet-in"></div></div>
+  <div class="toast" id="toast" hidden></div>
+</div>
+
+<!-- le document, seul élément imprimé -->
+<div class="impression" id="impression" aria-hidden="true"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
