@@ -7,6 +7,7 @@ const COQUILLE = [
   "cr.css",
   "app.js",
   "manifest.webmanifest",
+  "amorcage.enc",
   "assets/emblem.png",
   "assets/saint-mommolin.jpg",
   "assets/icon-192.png",

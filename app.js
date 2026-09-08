@@ -1108,10 +1108,54 @@ window.addEventListener("beforeunload", () => {
   try { localStorage.setItem(CLE, JSON.stringify(S)); } catch (e) { /* rien à faire */ }
 });
 
+/* ------------------------- amorçage du conseil -------------------------
+   L'adresse est publique : l'amorçage est chiffré dans le dossier publié, et
+   la phrase de passe voyage dans le lien d'installation. Une fois chargé, il
+   vit dans l'appareil et le lien n'est plus nécessaire. */
+function b64versOctets(b64) {
+  const bin = atob(b64.trim());
+  const o = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) o[i] = bin.charCodeAt(i);
+  return o;
+}
+async function dechiffrer(b64, phrase) {
+  const tout = b64versOctets(b64);
+  const sel = tout.slice(0, 16), iv = tout.slice(16, 28), corps = tout.slice(28);
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(phrase), "PBKDF2", false, ["deriveKey"]);
+  const cle = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: sel, iterations: 150000, hash: "SHA-256" },
+    base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  const clair = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, cle, corps);
+  return new TextDecoder().decode(clair);
+}
+function phraseDuLien() {
+  const m = /[#&?]c=([A-Za-z0-9]+)/.exec(location.hash + location.search);
+  if (m) return m[1];
+  try { return sessionStorage.getItem("csm.phrase") || ""; } catch (e) { return ""; }
+}
+async function amorcer() {
+  const phrase = phraseDuLien();
+  if (!phrase) return false;
+  try { sessionStorage.setItem("csm.phrase", phrase); } catch (e) { /* peu importe */ }
+  try {
+    const rep = await fetch("amorcage.enc", { cache: "no-cache" });
+    if (!rep.ok) return false;
+    const o = JSON.parse(await dechiffrer(await rep.text(), phrase));
+    if (!o || o.v !== 1 || !Array.isArray(o.effectif)) return false;
+    S = o; sauver(); rendre();
+    toast("Conseil chargé : " + o.effectif.length + " frères.");
+    return true;
+  } catch (e) {
+    toast("Le lien d'installation n'est pas le bon.");
+    return false;
+  }
+}
+
 /* ------------------------------ départ ------------------------------ */
 S = charger();
 setMode("note");
 rendre();
+if (!S.effectif.length && !S.archives.length) amorcer();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
