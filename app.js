@@ -88,11 +88,37 @@ function anneeFraternelle() {
   return d.getMonth() >= 6 ? a + "-" + (a + 1) : (a - 1) + "-" + a;
 }
 
+/* ------------------- la réserve d'enregistrements -------------------
+   Un enregistrement d'une heure pèse des dizaines de mégaoctets : il ne peut
+   pas tenir dans le stockage des réglages. Il vit dans la base du navigateur,
+   dans cet appareil, et la séance n'en garde que la fiche. */
+const BASE_AUDIO = "csm.audio";
+function ouvrirBase() {
+  return new Promise((ok, ko) => {
+    const d = indexedDB.open(BASE_AUDIO, 1);
+    d.onupgradeneeded = () => { d.result.createObjectStore("audios"); };
+    d.onsuccess = () => ok(d.result);
+    d.onerror = () => ko(d.error);
+  });
+}
+function surBase(mode, action) {
+  return ouvrirBase().then(b => new Promise((ok, ko) => {
+    const t = b.transaction("audios", mode);
+    const r = action(t.objectStore("audios"));
+    t.oncomplete = () => ok(r && r.result !== undefined ? r.result : null);
+    t.onerror = () => ko(t.error);
+  }));
+}
+const rangerAudio = (id, blob) => surBase("readwrite", m => m.put(blob, id));
+const lireAudio = id => surBase("readonly", m => m.get(id));
+const jeterAudio = id => surBase("readwrite", m => m.delete(id));
+
 /* --------------------------- persistance --------------------------- */
 let S = null;
 let vueCourante = "seance", secCourante = 1, mode = "note";
 let svOuvert = null, frOuvert = null, filtreSv = "actifs";
 let modeSuppr = false;
+let crAffiche = null;   /* null : la séance en cours ; sinon l'id d'une archive */
 const choisis = new Set();
 let sauveTimer = null;
 let gele = false;   /* on quitte le bac à sable : plus une seule écriture */
@@ -129,9 +155,22 @@ function migrer(o) {
 function completerSeance(s) {
   if (!Array.isArray(s.notes)) s.notes = [];
   if (!Array.isArray(s.invites)) s.invites = [];
-  if (!s.france) s.france = { membres:"", conseils:"", dioceses:"", creations:"", quand:"" };
-  if (!s.padre) s.padre = { titre:"", audio:true };
-  if (!s.presentation) s.presentation = { qui:"", sujet:"", audio:true };
+  if (!s.france) s.france = { membres:"", conseils:"", dioceses:"", creations:"", quand:"", texte:"" };
+  /* la phrase des créations était fabriquée : elle devient un texte qu'on
+     reprend et qu'on corrige, pré-rempli une fois depuis les anciens champs */
+  if (typeof s.france.texte !== "string") {
+    const f = s.france;
+    s.france.texte = f.creations
+      ? f.creations + " conseil" + (parseInt(f.creations, 10) > 1 ? "s ont" : " a") + " été créé"
+        + (parseInt(f.creations, 10) > 1 ? "s" : "") + " cette année"
+        + (f.quand ? ", le dernier le " + dateLisible(f.quand) : "") + "."
+      : "";
+  }
+  if (!s.padre) s.padre = { titre:"", audio:null };
+  if (!s.presentation) s.presentation = { qui:"", sujet:"", audio:null };
+  /* « joint » n'était qu'une case cochée : sans fichier, elle mentait. */
+  if (typeof s.padre.audio !== "object") s.padre.audio = null;
+  if (typeof s.presentation.audio !== "object") s.presentation.audio = null;
   if (!s.prochain) s.prochain = { date:"", heure:"20h30", lieu:"", topo:"" };
   s.prochain.date = versIso(s.prochain.date);
   if (!s.prochain.date) s.prochain.date = prochainPremierMardi(s.debut || Date.now());
@@ -156,8 +195,18 @@ const nomDeId = id => nomc(parId(id));
 function hhmm(ms) { const d = new Date(ms); return String(d.getHours()).padStart(2,"0") + " h " + String(d.getMinutes()).padStart(2,"0"); }
 function mmss(ms) { const s = Math.max(0, Math.floor(ms/1000));
   return String(Math.floor(s/60)).padStart(2,"0") + ":" + String(s%60).padStart(2,"0"); }
+/* Une séance oubliée ouverte ne doit pas afficher « 4320:07 » : passé l'heure,
+   on compte en heures, et passé la journée, en jours. */
+function duree(ms) {
+  const s = Math.max(0, Math.floor(ms/1000));
+  if (s < 3600) return mmss(ms);
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
+  if (h < 24) return h + " h " + String(m).padStart(2,"0");
+  return Math.floor(h/24) + " j " + (h%24) + " h";
+}
 function dateLongue(ms) { const d = new Date(ms);
   return JOURS[d.getDay()] + " " + d.getDate() + " " + MOIS[d.getMonth()] + " " + d.getFullYear(); }
+const poidsLisible = o => o < 1048576 ? Math.round(o / 1024) + " Ko" : (o / 1048576).toFixed(1) + " Mo";
 function toast(txt) {
   const t = $("#toast"); t.textContent = txt; t.hidden = false;
   clearTimeout(toast._h); toast._h = setTimeout(() => { t.hidden = true; }, 2600);
@@ -190,9 +239,11 @@ function versIso(d) {
   return an + "-" + m[2].padStart(2,"0") + "-" + m[1].padStart(2,"0");
 }
 const estIso = d => /^\d{4}-\d{2}-\d{2}$/.test(d || "");
+/* Deux dates de même jour et de mois voisins ne se classent qu'à l'année :
+   elle s'écrit, plutôt que de se deviner. */
 function jourCourt(d) {
   d = versIso(d);
-  return estIso(d) ? d.slice(8,10) + "/" + d.slice(5,7) : (d || "");
+  return estIso(d) ? d.slice(8,10) + "/" + d.slice(5,7) + "/" + d.slice(0,4) : (d || "");
 }
 function clefDate(d) { d = versIso(d); return estIso(d) ? d.replace(/-/g,"") : "9999"; }
 function dateLisible(d) {
@@ -234,9 +285,9 @@ function debuterSeance(avecAudio) {
   const p = derniereSeance();
   S.seance = completerSeance({
     id: uid(), debut: Date.now(), fin: null, dicta: !!avecAudio,
-    padre: { titre: "", audio: true },
+    padre: { titre: "", audio: null },
     comptes: p ? p.comptes : "",
-    presentation: { qui: "", sujet: "", audio: true },
+    presentation: { qui: "", sujet: "", audio: null },
     prochain: { date: prochainPremierMardi(Date.now()),
       heure: p ? p.prochain.heure : "20h30",
       lieu: (p && p.prochain.lieu) || S.conseil.lieu, topo: "" },
@@ -255,6 +306,7 @@ function cloreSeance() {
   SE().dicta = false;
   SE().tk = null;
   garderEcran(false);
+  crAffiche = null;
   vueCourante = "cr";
   maj();
   toast("Séance close. Le compte rendu est prêt.");
@@ -270,13 +322,16 @@ function archiverSeance() {
     services: JSON.parse(JSON.stringify(S.services)),
     evenements: JSON.parse(JSON.stringify(S.evenements)),
     retenir: JSON.parse(JSON.stringify(S.retenir)),
+    ceremonies: JSON.parse(JSON.stringify(S.ceremonies || [])),
+    objectif: S.objectif || "",
     seance: JSON.parse(JSON.stringify(s))
   });
   if (S.archives.length > 24) S.archives.length = 24;
   S.seance = null;
+  crAffiche = S.archives[0].id;
   vueCourante = "seance";
   maj();
-  toast("Séance archivée.");
+  toast("Séance archivée. Son compte rendu reste consultable.");
 }
 function ajouterNote(sec, type, txt) {
   const s = SE(); if (!s) return;
@@ -449,12 +504,40 @@ function blocTopo(v, cible, titreBloc, champTitre, valTitre, setTitre, ph) {
   const th = el("div", "th"); th.appendChild(el("h3", null, titreBloc)); o.appendChild(th);
   const tb = el("div", "tb");
   champ(tb, champTitre, valTitre, setTitre, ph);
-  const c = el("div", "chipline");
   const obj = cible === "padre" ? SE().padre : SE().presentation;
-  const b = el("button", "chip" + (obj.audio ? " on" : ""), "Enregistrement joint"); b.type = "button";
-  b.addEventListener("click", () => { obj.audio = !obj.audio; maj(); });
-  c.appendChild(b); tb.appendChild(c);
-  tb.appendChild(el("div", "derive", "L'enregistreur du téléphone tourne à part ; le fichier se joint au compte rendu au moment de l'enregistrer."));
+  if (obj.audio) {
+    const l = el("div", "joint");
+    const w = el("div", "who");
+    w.appendChild(el("div", "nm", obj.audio.nom));
+    w.appendChild(el("div", "po", poidsLisible(obj.audio.taille) + " — joint au compte rendu"));
+    l.appendChild(w);
+    const x = el("button", "mini", "×"); x.type = "button";
+    x.setAttribute("aria-label", "Retirer l'enregistrement");
+    x.addEventListener("click", () => {
+      if (!confirm("Retirer l'enregistrement « " + obj.audio.nom + " » ?")) return;
+      const id = obj.audio.id;
+      obj.audio = null; maj();
+      jeterAudio(id).catch(() => { /* déjà parti */ });
+    });
+    l.appendChild(x);
+    tb.appendChild(l);
+  } else {
+    const inp = el("input"); inp.type = "file"; inp.accept = "audio/*"; inp.hidden = true;
+    inp.addEventListener("change", async () => {
+      const f = inp.files[0]; inp.value = "";
+      if (!f) return;
+      const id = uid();
+      try { await rangerAudio(id, f); }
+      catch (e) { toast("Cet appareil refuse de garder le fichier."); return; }
+      obj.audio = { id: id, nom: f.name, taille: f.size, type: f.type || "audio/mpeg" };
+      maj();
+      toast("Enregistrement joint : " + poidsLisible(f.size));
+    });
+    const bj = el("button", "addl", "Joindre l'enregistrement"); bj.type = "button";
+    bj.addEventListener("click", () => inp.click());
+    tb.appendChild(bj); tb.appendChild(inp);
+    tb.appendChild(el("div", "derive", "L'enregistreur du téléphone tourne à part. Le fichier choisi ici reste dans l'appareil et part avec le compte rendu — tant qu'aucun fichier n'est joint, le document n'en annonce aucun."));
+  }
   const g = el("button", "gros", "Lancer le chrono — 10 minutes"); g.type = "button";
   g.addEventListener("click", () => {
     const t = cible === "padre" ? SE().padre.titre : SE().presentation.sujet;
@@ -840,12 +923,12 @@ function outilFrance(v) {
     const i = champ(tb, lib, f[k], x => { f[k] = x; }, ph);
     i.inputMode = "numeric";
   };
-  num("Membres en France", "membres", "3 200");
+  num("Membres en France", "membres", "1 697");
   num("Conseils", "conseils", "78");
   num("Diocèses", "dioceses", "42");
-  num("Conseils créés cette année", "creations", "4");
-  champDate(tb, "Dernière création", f.quand, x => { f.quand = x; });
-  tb.appendChild(el("div", "derive", "Ces quatre chiffres se reportent d'une séance sur l'autre : ne corrigez que ce qui a bougé."));
+  champ(tb, "Ce qu'il y a à en dire", f.texte, x => { f.texte = x; },
+    "Deux conseils ont été créés cette année, le dernier à Pau en juin.", true);
+  tb.appendChild(el("div", "derive", "Les trois chiffres et la phrase se reportent d'une séance sur l'autre : ne corrigez que ce qui a bougé."));
   o.appendChild(tb); v.appendChild(o);
 }
 
@@ -1001,7 +1084,7 @@ function vueSeance(v) {
     if (S.archives.length) {
       const arc = el("button", "gros sec", S.archives.length + " séance" + (S.archives.length > 1 ? "s" : "") + " en archive");
       arc.type = "button";
-      arc.addEventListener("click", ouvrirReglages);
+      arc.addEventListener("click", () => { crAffiche = null; vueCourante = "cr"; rendre(); });
       d.appendChild(arc);
     }
     v.appendChild(d);
@@ -1026,6 +1109,20 @@ function vueSeance(v) {
     d.appendChild(a);
     v.appendChild(d);
     return;
+  }
+
+  /* Une séance laissée ouverte fausse tout ce qui se compte en minutes. */
+  if (!SE().fin && Date.now() - SE().debut > 4 * 3600000) {
+    const al = el("div", "alerte");
+    al.appendChild(el("b", null, "Séance ouverte depuis " + duree(Date.now() - SE().debut)));
+    al.appendChild(document.createTextNode("Le compteur tourne encore. Clore la séance l'arrête et prépare le compte rendu."));
+    const b = el("button", "addl", "Clore la séance"); b.type = "button";
+    b.addEventListener("click", () => {
+      if (!confirm("Clore la séance ? Le compte rendu devient consultable et modifiable.")) return;
+      cloreSeance();
+    });
+    al.appendChild(b);
+    v.appendChild(al);
   }
 
   if (SE().tk) { panneauChrono(v); }
@@ -1231,8 +1328,11 @@ function documentHTML(src) {
     if (mois) { const t = src.topos.find(x => (x[0] || "").toLowerCase() === mois); topo = t ? t[1] : ""; }
   }
 
+  /* Un service « en cours » court toute l'année : il encombre le tableau du
+     mois sans rien apprendre, et se retrouve dans « à retenir toute l'année ». */
   const ordre = { v:0, c:1, t:2 };
-  const svcs = src.services.slice().sort((a, b) => ordre[a.st] - ordre[b.st] || clefDate(b.date).localeCompare(clefDate(a.date)));
+  const svcs = src.services.filter(x => x.st !== "c")
+    .slice().sort((a, b) => ordre[a.st] - ordre[b.st] || clefDate(b.date).localeCompare(clefDate(a.date)));
 
   let n = 0;
   const sec = (titre, corps) => corps.trim()
@@ -1357,17 +1457,14 @@ function documentHTML(src) {
   /* --- l'Ordre en France, toujours dans la même forme --- */
   corps = "";
   const fr = s.france || {};
-  if (fr.membres || fr.conseils || fr.dioceses || fr.creations) {
+  if (fr.membres || fr.conseils || fr.dioceses) {
     const bouts = [];
     if (fr.membres) bouts.push("<b>" + esc(fr.membres) + "</b> membres");
     if (fr.conseils) bouts.push("<b>" + esc(fr.conseils) + "</b> conseils");
     if (fr.dioceses) bouts.push("<b>" + esc(fr.dioceses) + "</b> diocèses");
     corps += "<p>L’Ordre compte en France " + bouts.join(", ") + ".</p>";
-    if (fr.creations) corps += "<p><b>" + esc(fr.creations) + "</b> conseil"
-      + (parseInt(fr.creations, 10) > 1 ? "s ont" : " a") + " été créé"
-      + (parseInt(fr.creations, 10) > 1 ? "s" : "") + " cette année"
-      + (fr.quand ? ", le dernier le " + esc(dateLisible(fr.quand)) : "") + ".</p>";
   }
+  if ((fr.texte || "").trim()) corps += "<p>" + esc(fr.texte.trim()) + "</p>";
   notesDe("france").forEach(x => { corps += "<p>" + esc(x.txt) + "</p>"; });
   H.push(sec("L'Ordre en France", corps));
 
@@ -1420,12 +1517,65 @@ function documentHTML(src) {
   return H.join("");
 }
 
+/* Les comptes rendus se consultent en pile, du plus récent au plus ancien :
+   la séance en cours d'abord, puis les séances closes et archivées. */
+function listeCR() {
+  const l = [];
+  if (SE()) l.push({ id: null, src: S, quand: SE().debut,
+    lib: dateLongue(SE().debut) + (SE().fin ? "" : " — en cours") });
+  (S.archives || []).forEach(a => {
+    if (a && a.seance) l.push({ id: a.id, src: a, quand: a.debut, lib: dateLongue(a.debut) });
+  });
+  /* deux séances le même jour ne doivent pas porter le même nom */
+  l.forEach((x, i) => {
+    if (l.some((y, j) => j !== i && dateLongue(y.quand) === dateLongue(x.quand)))
+      x.lib = x.lib.replace(dateLongue(x.quand), dateLongue(x.quand) + ", " + hhmm(x.quand));
+  });
+  return l;
+}
+function sourceCR() {
+  const l = listeCR();
+  if (!l.length) return null;
+  const t = l.find(x => x.id === crAffiche);
+  return (t || l[0]).src;
+}
+
 function vueCR(v) {
-  if (!SE()) { v.appendChild(el("div", "vide-fil", "Aucune séance en cours. Débutez-en une dans l'onglet Séance.")); return; }
+  const l = listeCR();
+  if (!l.length) {
+    v.appendChild(el("div", "vide-fil", "Aucun compte rendu. Débutez une séance dans l'onglet Séance."));
+    return;
+  }
+  let i = l.findIndex(x => x.id === crAffiche);
+  if (i < 0) { i = 0; crAffiche = l[0].id; }
+
+  if (l.length > 1) {
+    const bar = el("div", "crbar");
+    const prec = el("button", "nav", "‹"); prec.type = "button";
+    prec.setAttribute("aria-label", "Compte rendu plus récent");
+    prec.disabled = i === 0;
+    prec.addEventListener("click", () => { crAffiche = l[i - 1].id; rendre(); });
+    const suiv = el("button", "nav", "›"); suiv.type = "button";
+    suiv.setAttribute("aria-label", "Compte rendu plus ancien");
+    suiv.disabled = i === l.length - 1;
+    suiv.addEventListener("click", () => { crAffiche = l[i + 1].id; rendre(); });
+    const sel = el("select");
+    l.forEach((x, j) => {
+      const o = el("option", null, x.lib);
+      o.value = String(j);
+      if (j === i) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener("change", () => { crAffiche = l[parseInt(sel.value, 10)].id; rendre(); });
+    bar.appendChild(prec); bar.appendChild(sel); bar.appendChild(suiv);
+    v.appendChild(bar);
+  }
+
+  const src = l[i].src;
   const box = el("div");
-  box.innerHTML = documentHTML(S);
+  box.innerHTML = documentHTML(src);
   v.appendChild(box);
-  preparerImpression(S);
+  preparerImpression(src);
 
   const a = el("div", "docact");
   const b2 = el("button", "s", "PDF simplifié"); b2.type = "button";
@@ -1434,11 +1584,12 @@ function vueCR(v) {
   b1.addEventListener("click", ouvrirEnvoi);
   a.appendChild(b2); a.appendChild(b1);
   v.appendChild(a);
-  v.appendChild(el("div", "derive", "Le compte rendu s'enregistre en une page à envoyer : elle s'ouvre sur n'importe quel téléphone, garde la mise en forme du conseil, et peut porter les enregistrements des topos."));
+  v.appendChild(el("div", "derive", "Le compte rendu s'enregistre en une page à envoyer : elle s'ouvre sur n'importe quel téléphone, garde la mise en forme du conseil, et porte les enregistrements joints aux topos."));
 }
 
 function preparerImpression(src) {
-  $("#impression").innerHTML = (src || S).seance ? documentHTML(src || S) : "";
+  src = src || sourceCR();
+  $("#impression").innerHTML = (src && src.seance) ? documentHTML(src) : "";
 }
 function imprimer() {
   preparerImpression(S);
@@ -1465,9 +1616,10 @@ async function urlEnDataURL(u) {
   const rep = await fetch(u, { cache: "force-cache" });
   return fichierEnDataURL(await rep.blob());
 }
-function nomFichier(ext) {
-  const d = new Date(SE().debut);
-  return "CR-" + S.conseil.nom.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "")
+function nomFichier(ext, src) {
+  src = src || sourceCR();
+  const d = new Date(src.seance.debut);
+  return "CR-" + src.conseil.nom.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "")
     + "-" + d.getFullYear() + String(d.getMonth() + 1).padStart(2,"0")
     + String(d.getDate()).padStart(2,"0") + "." + ext;
 }
@@ -1478,13 +1630,13 @@ function telecharger(blob, nom) {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 8000);
 }
-const poidsLisible = o => o < 1048576 ? Math.round(o / 1024) + " Ko" : (o / 1048576).toFixed(1) + " Mo";
 
-async function construirePage(audios) {
+async function construirePage(audios, src) {
+  src = src || sourceCR();
   const css = await (await fetch("cr.css", { cache: "force-cache" })).text();
   const emb = await urlEnDataURL("assets/emblem.png");
   const fil = await urlEnDataURL("assets/saint-mommolin.jpg");
-  let corps = documentHTML(S)
+  let corps = documentHTML(src)
     .replace(/assets\/emblem\.png/g, emb)
     .replace(/assets\/saint-mommolin\.jpg/g, fil);
 
@@ -1498,8 +1650,8 @@ async function construirePage(audios) {
     corps = corps.replace('<p class="formule">', bloc + '<p class="formule">');
   }
 
-  const d = new Date(SE().debut);
-  const titre = "Compte rendu — " + S.conseil.nom + " — " + d.getDate() + " " + MOIS[d.getMonth()] + " " + d.getFullYear();
+  const d = new Date(src.seance.debut);
+  const titre = "Compte rendu — " + src.conseil.nom + " — " + d.getDate() + " " + MOIS[d.getMonth()] + " " + d.getFullYear();
   return "<!DOCTYPE html>\n<html lang=\"fr\">\n<head>\n<meta charset=\"UTF-8\">\n"
     + '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
     + "<title>" + esc(titre) + "</title>\n"
@@ -1517,6 +1669,17 @@ async function construirePage(audios) {
     + "</style>\n</head>\n<body>\n" + corps + "\n</body>\n</html>\n";
 }
 
+async function audiosDeLaSeance(src) {
+  const out = [];
+  for (const o of [src.seance.padre.audio, src.seance.presentation.audio]) {
+    if (!o) continue;
+    try {
+      const blob = await lireAudio(o.id);
+      if (blob) out.push({ nom: o.nom, taille: o.taille, blob: blob });
+    } catch (e) { /* le fichier a disparu de l'appareil */ }
+  }
+  return out;
+}
 function ouvrirEnvoi() {
   const joints = [];
   ouvrirFormulaire("Enregistrer le compte rendu", (c, b) => {
@@ -1547,13 +1710,20 @@ function ouvrirEnvoi() {
       else if (total > 20 * 1048576)
         zone.appendChild(el("div", "alerte", "Au-delà d'une vingtaine de mégaoctets, le courriel passera mal : mieux vaut envoyer l'audio à part."));
     });
-    const bj = el("button", "addl", "Joindre un enregistrement"); bj.type = "button";
+    const bj = el("button", "addl", "Joindre un autre enregistrement"); bj.type = "button";
     bj.addEventListener("click", () => inp.click());
     c.appendChild(bj); c.appendChild(inp);
+
+    /* ce qui a été joint pendant la séance part sans qu'on y repense */
+    audiosDeLaSeance(sourceCR()).then(async liste => {
+      for (const a of liste) joints.push({ nom: a.nom, taille: a.taille, data: await fichierEnDataURL(a.blob) });
+      if (liste.length) inp.dispatchEvent(new Event("change"));
+    });
   }, () => {
+    const src = sourceCR();
     toast("Préparation du compte rendu…");
-    construirePage(joints).then(html => {
-      telecharger(new Blob([html], { type: "text/html;charset=utf-8" }), nomFichier("html"));
+    construirePage(joints, src).then(html => {
+      telecharger(new Blob([html], { type: "text/html;charset=utf-8" }), nomFichier("html", src));
       toast("Compte rendu enregistré dans vos téléchargements.");
     }).catch(() => toast("La page n'a pas pu être produite."));
     return "";
@@ -1618,7 +1788,7 @@ function texteDuCR(src) {
 
   bloc("Trésorerie", [s.comptes.trim() ? "Solde : " + s.comptes.trim() : ""].concat(notesDe("comptes")));
 
-  bloc("Services de l'année", src.services.map(x =>
+  bloc("Services de l'année", src.services.filter(x => x.st !== "c").map(x =>
     "[" + ST[x.st] + "] " + x.pj + (x.resp ? " — " + x.resp : "")
     + (x.date ? " — " + (dateLisible(x.date) || x.date) : "") + (x.pr ? " — " + x.pr : ""))
     .concat(notesDe("services")).concat(notesDe("dates")));
@@ -1629,7 +1799,7 @@ function texteDuCR(src) {
       ? [fr.membres ? fr.membres + " membres" : "", fr.conseils ? fr.conseils + " conseils" : "",
          fr.dioceses ? fr.dioceses + " diocèses" : ""].filter(Boolean).join(", ") + "."
       : "",
-    fr.creations ? fr.creations + " conseil(s) créé(s) cette année" + (fr.quand ? ", le dernier le " + dateLisible(fr.quand) : "") + "." : ""
+    (fr.texte || "").trim()
   ].concat(notesDe("france")));
 
   bloc("Propositions spirituelles", src.trinomes.filter(t => t.some(Boolean))
@@ -1646,6 +1816,8 @@ function texteDuCR(src) {
   return B;
 }
 async function exporterPDF() {
+  const src = sourceCR();
+  if (!src) return;
   try { await chargerJsPDF(); } catch (e) { toast("Le module PDF n'a pas pu être chargé."); return; }
   const doc = new window.jspdf.jsPDF({ unit: "mm", format: "a4" });
   const L = 20, R = 190, HAUT = 20, BAS = 282;
@@ -1655,14 +1827,14 @@ async function exporterPDF() {
   doc.setFont("times", "bold"); doc.setFontSize(16);
   doc.text("Chevaliers de Colomb", 105, y, { align: "center" }); y += 7;
   doc.setFontSize(13);
-  doc.text(S.conseil.nom, 105, y, { align: "center" }); y += 7;
+  doc.text(src.conseil.nom, 105, y, { align: "center" }); y += 7;
   doc.setFont("times", "normal"); doc.setFontSize(11);
-  doc.text("Compte rendu de la réunion du " + dateLongue(SE().debut), 105, y, { align: "center" }); y += 5;
+  doc.text("Compte rendu de la réunion du " + dateLongue(src.seance.debut), 105, y, { align: "center" }); y += 5;
   doc.setFontSize(9);
-  doc.text("Année fraternelle " + S.conseil.annee, 105, y, { align: "center" }); y += 8;
+  doc.text("Année fraternelle " + src.conseil.annee, 105, y, { align: "center" }); y += 8;
   doc.setLineWidth(0.4); doc.line(L, y, R, y); y += 8;
 
-  texteDuCR(S).forEach(b => {
+  texteDuCR(src).forEach(b => {
     saut(14);
     doc.setFont("times", "bold"); doc.setFontSize(12);
     doc.text(b.t, L, y); y += 6;
@@ -1679,7 +1851,7 @@ async function exporterPDF() {
   saut(24);
   y += 4;
   doc.setFont("times", "italic"); doc.setFontSize(10.5);
-  doc.text("Le secrétaire-archiviste du " + S.conseil.nom + ", " + S.conseil.secretaire, L, y); y += 7;
+  doc.text("Le secrétaire-archiviste du " + src.conseil.nom + ", " + src.conseil.secretaire, L, y); y += 7;
   doc.setFont("times", "normal");
   doc.text("Charité · Unité · Fraternité", 105, y, { align: "center" });
 
@@ -1690,7 +1862,7 @@ async function exporterPDF() {
     doc.text("Document interne — ne pas diffuser hors du conseil", L, 290);
     doc.text(i + " / " + n, R, 290, { align: "right" });
   }
-  doc.save(nomFichier("pdf"));
+  doc.save(nomFichier("pdf", src));
   toast("PDF simplifié enregistré.");
 }
 
@@ -1773,9 +1945,24 @@ function ouvrirReglages() {
     S.archives.forEach(a => {
       const b = el("button", "addl", dateLongue(a.debut)); b.type = "button";
       b.style.textAlign = "left";
-      b.addEventListener("click", () => { preparerImpression(a); setTimeout(() => window.print(), 60); });
+      b.addEventListener("click", () => {
+        crAffiche = a.id; vueCourante = "cr";
+        $("#sheet").hidden = true; rendre();
+      });
       c.appendChild(b);
     });
+  }
+
+  if (SE() && !SE().fin) {
+    c.appendChild(el("div", "filtitre", "Séance en cours"));
+    c.appendChild(el("div", "derive", "Ouverte depuis " + duree(Date.now() - SE().debut)
+      + ". La clore arrête le compteur et rend le compte rendu consultable ; elle se rouvre si besoin."));
+    const bc = el("button", "addl", "Clore la séance"); bc.type = "button";
+    bc.addEventListener("click", () => {
+      if (!confirm("Clore la séance ? Le compte rendu devient consultable et modifiable.")) return;
+      cloreSeance(); $("#sheet").hidden = true;
+    });
+    c.appendChild(bc);
   }
 
   c.appendChild(el("div", "filtitre", "Essayer sans rien casser"));
@@ -1905,7 +2092,7 @@ ta.addEventListener("keydown", e => {
 
 setInterval(() => {
   const s = SE();
-  $("#chrono").textContent = s ? mmss((s.fin || Date.now()) - s.debut) : "00:00";
+  $("#chrono").textContent = s ? duree((s.fin || Date.now()) - s.debut) : "00:00";
   $("#chrono").hidden = !s;
   if (s && s.tk) {
     const reste = s.tk.duree - (Date.now() - s.tk.debut);
