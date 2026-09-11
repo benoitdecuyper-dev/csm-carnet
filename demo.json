@@ -1,0 +1,283 @@
+{
+  "v": 2,
+  "conseil": {
+    "nom": "Conseil de démonstration",
+    "secteur": "Secteur d'essai",
+    "ville": "Bordeaux",
+    "lieu": "Salle paroissiale",
+    "secretaire": "Le secrétaire",
+    "annee": "2026-2027"
+  },
+  "effectif": [
+    {
+      "id": "d01",
+      "p": "Ambroise",
+      "n": "",
+      "po": "Aumônier",
+      "asp": false,
+      "pere": true,
+      "etape": ""
+    },
+    {
+      "id": "d02",
+      "p": "Anselme",
+      "n": "",
+      "po": "Grand Chevalier",
+      "asp": false,
+      "pere": false,
+      "etape": ""
+    },
+    {
+      "id": "d03",
+      "p": "Barnabé",
+      "n": "",
+      "po": "Député Grand Chevalier",
+      "asp": false,
+      "pere": false,
+      "etape": ""
+    },
+    {
+      "id": "d04",
+      "p": "Côme",
+      "n": "",
+      "po": "Secrétaire-archiviste",
+      "asp": false,
+      "pere": false,
+      "etape": ""
+    },
+    {
+      "id": "d05",
+      "p": "Damase",
+      "n": "",
+      "po": "Trésorier",
+      "asp": false,
+      "pere": false,
+      "etape": ""
+    },
+    {
+      "id": "d06",
+      "p": "Eugène",
+      "n": "",
+      "po": "Cérémoniaire",
+      "asp": false,
+      "pere": false,
+      "etape": ""
+    },
+    {
+      "id": "d07",
+      "p": "Firmin",
+      "n": "",
+      "po": "",
+      "asp": false,
+      "pere": false,
+      "etape": ""
+    },
+    {
+      "id": "d08",
+      "p": "Gaspard",
+      "n": "",
+      "po": "",
+      "asp": false,
+      "pere": false,
+      "etape": ""
+    },
+    {
+      "id": "d09",
+      "p": "Hilaire",
+      "n": "",
+      "po": "",
+      "asp": false,
+      "pere": false,
+      "etape": ""
+    },
+    {
+      "id": "d10",
+      "p": "Isidore",
+      "n": "",
+      "po": "",
+      "asp": true,
+      "pere": false,
+      "etape": "Formulaire 100 remis"
+    },
+    {
+      "id": "d11",
+      "p": "Jourdain",
+      "n": "",
+      "po": "",
+      "asp": true,
+      "pere": false,
+      "etape": "Pressenti"
+    }
+  ],
+  "trinomes": [
+    [
+      "d02",
+      "d03",
+      "d04"
+    ],
+    [
+      "d05",
+      "d06",
+      "d07"
+    ],
+    [
+      "d08",
+      "d09",
+      "d01"
+    ]
+  ],
+  "topos": [
+    [
+      "septembre",
+      "Anselme"
+    ],
+    [
+      "octobre",
+      "Barnabé"
+    ],
+    [
+      "novembre",
+      "Côme"
+    ],
+    [
+      "décembre",
+      ""
+    ]
+  ],
+  "services": [
+    {
+      "id": "s1",
+      "st": "v",
+      "pj": "Vente de crêpes à la sortie de la messe",
+      "resp": "Damase",
+      "date": "2026-09-27",
+      "pr": "prévoir deux plaques"
+    },
+    {
+      "id": "s2",
+      "st": "v",
+      "pj": "Collecte pour la banque alimentaire",
+      "resp": "Firmin",
+      "date": "2026-10-17",
+      "pr": ""
+    },
+    {
+      "id": "s3",
+      "st": "c",
+      "pj": "Entretien du jardin du presbytère",
+      "resp": "Gaspard",
+      "date": "chaque samedi",
+      "pr": "toute l'année"
+    },
+    {
+      "id": "s4",
+      "st": "t",
+      "pj": "Kermesse de juin",
+      "resp": "Eugène",
+      "date": "2026-06-20",
+      "pr": "412 € récoltés"
+    }
+  ],
+  "evenements": [
+    {
+      "id": "e1",
+      "q": "Pèlerinage diocésain",
+      "date": "2026-10-11"
+    }
+  ],
+  "retenir": [
+    "La quête du premier dimanche revient au conseil.",
+    "Le jardin du presbytère se tient chaque samedi."
+  ],
+  "ceremonies": [
+    {
+      "id": "c1",
+      "q": "Exemplification charité, unité, fraternité",
+      "date": "2026-11-14",
+      "lieu": "Cathédrale",
+      "qui": "Isidore"
+    }
+  ],
+  "objectif": "deux nouveaux frères cette année",
+  "seance": {
+    "id": "seance-demo",
+    "debut": 1788287400000,
+    "fin": null,
+    "dicta": false,
+    "padre": {
+      "titre": "Ce que la fraternité demande",
+      "audio": null
+    },
+    "comptes": "312,40 €",
+    "presentation": {
+      "qui": "d07",
+      "sujet": "son chemin jusqu'au conseil",
+      "audio": null
+    },
+    "prochain": {
+      "date": "2026-10-06",
+      "heure": "20h30",
+      "lieu": "Salle paroissiale",
+      "topo": ""
+    },
+    "france": {
+      "membres": "1697",
+      "conseils": "78",
+      "dioceses": "42",
+      "creations": "",
+      "quand": "",
+      "texte": "Deux conseils ont été créés cette année, le dernier à Pau en juin."
+    },
+    "invites": [
+      {
+        "id": "i1",
+        "txt": "Un frère du conseil voisin"
+      }
+    ],
+    "audios": [],
+    "tk": null,
+    "presence": {
+      "d01": "P",
+      "d02": "P",
+      "d03": "P",
+      "d04": "P",
+      "d05": "P",
+      "d06": "P",
+      "d07": "P",
+      "d08": "P",
+      "d09": "P",
+      "d10": "E",
+      "d11": "A"
+    },
+    "notes": [
+      {
+        "id": "n1",
+        "sec": "effectif",
+        "type": "note",
+        "txt": "Ouverture à l'heure, quorum atteint.",
+        "t": 120000,
+        "qui": "",
+        "quand": ""
+      },
+      {
+        "id": "n2",
+        "sec": "topo",
+        "type": "note",
+        "txt": "Le Padre rappelle que la fraternité se prouve aux moments creux.",
+        "t": 420000,
+        "qui": "",
+        "quand": ""
+      },
+      {
+        "id": "n3",
+        "sec": "services",
+        "type": "action",
+        "txt": "Réserver la salle pour la vente de crêpes.",
+        "t": 900000,
+        "qui": "d05",
+        "quand": "Sous 8 jours"
+      }
+    ]
+  },
+  "archives": []
+}

@@ -1902,13 +1902,37 @@ function entrerBac() {
     localStorage.setItem(CLE_BAC, JSON.stringify(S));
     sessionStorage.setItem("csm.bac", "1");
   } catch (e) { toast("Impossible d'ouvrir le bac à sable ici."); return; }
-  location.reload();
+  location.replace(location.pathname);
 }
 function quitterBac() {
   gele = true;
   clearTimeout(sauveTimer);
   try { localStorage.removeItem(CLE_BAC); sessionStorage.removeItem("csm.bac"); } catch (e) { /* rien */ }
-  location.reload();
+  /* on repart de l'adresse nue : un lien de démonstration ne doit pas se rejouer */
+  location.replace(location.pathname);
+}
+
+/* Le lien de démonstration ouvre un conseil entièrement fictif, et toujours
+   dans le bac à sable : essayer ne doit jamais coûter une séance réelle. */
+const veutDemo = () => /[#&?]demo(\b|$)/.test(location.hash + location.search);
+async function chargerDemo() {
+  try {
+    clearTimeout(sauveTimer);
+    const rep = await fetch("demo.json", { cache: "no-cache" });
+    if (!rep.ok) throw new Error("introuvable");
+    const o = migrer(await rep.json());
+    if (!o || !Array.isArray(o.effectif) || !o.seance) throw new Error("format");
+    try {
+      sessionStorage.setItem("csm.bac", "1");
+      localStorage.setItem(CLE_BAC, JSON.stringify(o));
+    } catch (e) { toast("Cet appareil refuse d'ouvrir le bac à sable."); return; }
+    S = o;
+    crAffiche = null; vueCourante = "seance"; secCourante = 2;
+    rendre();
+    toast("Séance de démonstration ouverte dans le bac à sable.");
+  } catch (e) {
+    toast("La démonstration n'a pas pu être chargée.");
+  }
 }
 
 /* ---------------------------- réglages ---------------------------- */
@@ -1980,6 +2004,13 @@ function ouvrirReglages() {
     be2.addEventListener("click", entrerBac);
     c.appendChild(be2);
   }
+  const bd = el("button", "addl", "Ouvrir la séance de démonstration"); bd.type = "button";
+  bd.addEventListener("click", () => {
+    if (!confirm("Ouvrir le conseil de démonstration ? Il remplace le contenu du bac à sable, jamais celui de votre carnet.")) return;
+    $("#sheet").hidden = true;
+    chargerDemo();
+  });
+  c.appendChild(bd);
 
   const bz = el("button", "addl danger", "Effacer tout et repartir de zéro"); bz.type = "button";
   bz.addEventListener("click", () => {
@@ -2163,7 +2194,17 @@ S = charger();
 setMode("note");
 rendre();
 sauver();   /* un carnet d'une version d'avant est réécrit au format courant */
-if (!S.effectif.length && !S.archives.length) amorcer();
+/* Le lien de démonstration ouvre le bac, mais ne le vide pas à chaque
+   rechargement : un essai en cours — un enregistrement joint, par exemple —
+   doit survivre. Pour repartir de zéro, les réglages le proposent. */
+if (veutDemo() && !auBac()) chargerDemo();
+else if (!S.effectif.length && !S.archives.length) amorcer();
+
+/* Coller le lien dans un onglet déjà ouvert ne change que le fragment : le
+   script ne repart pas, et il ne se passerait rien. */
+window.addEventListener("hashchange", () => {
+  if (veutDemo() && !auBac()) chargerDemo();
+});
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

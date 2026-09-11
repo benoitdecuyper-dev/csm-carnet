@@ -1,5 +1,5 @@
 /* Le carnet doit fonctionner sans réseau : la salle paroissiale ne capte pas toujours. */
-const CACHE = "csm-v2";
+const CACHE = "csm-v3";
 const COQUILLE = [
   "./",
   "index.html",
@@ -8,6 +8,7 @@ const COQUILLE = [
   "app.js",
   "manifest.webmanifest",
   "amorcage.enc",
+  "demo.json",
   "vendor/jspdf.umd.min.js",
   "assets/emblem.png",
   "assets/saint-mommolin.jpg",
